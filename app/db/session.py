@@ -1,0 +1,48 @@
+from contextlib import contextmanager
+from typing import Iterator
+
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.core.config import settings
+
+
+def build_engine(url: str | None = None):
+    url = url or settings.DATABASE_URL
+    kwargs: dict = {"pool_pre_ping": True}
+    if url.startswith("sqlite"):
+        kwargs["connect_args"] = {"check_same_thread": False}
+    engine = create_engine(url, **kwargs)
+
+    if url.startswith("sqlite"):
+
+        @event.listens_for(engine, "connect")
+        def _fk_pragma(dbapi_conn, _):  # enforce FK constraints on SQLite
+            cur = dbapi_conn.cursor()
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.close()
+
+    return engine
+
+
+engine = build_engine()
+SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+
+def get_db() -> Iterator[Session]:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@contextmanager
+def transaction(db: Session) -> Iterator[Session]:
+    """Unit-of-work boundary: commit on success, roll back on any error."""
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise

@@ -1,0 +1,2 @@
+Single-database Alembic configuration.
+Usage: alembic upgrade head | alembic revision --autogenerate -m "msg"

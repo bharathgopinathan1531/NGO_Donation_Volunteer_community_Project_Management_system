@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ngo
+      POSTGRES_PASSWORD: ngo_password
+      POSTGRES_DB: ngo_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ngo -d ngo_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      DATABASE_URL: postgresql+psycopg2://ngo:ngo_password@db:5432/ngo_db
+      SECRET_KEY: ${SECRET_KEY:?set a strong SECRET_KEY (32+ chars) in your shell or .env}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-admin@ngo-demo.org}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?set SUPER_ADMIN_PASSWORD}
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
